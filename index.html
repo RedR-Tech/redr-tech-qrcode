@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RedR-Tech | Gerador de QR Code</title>
+  <meta name="description" content="Gerador profissional de QR Codes com texto para impressão, desenvolvido por RedR-Tech." />
+  <meta name="theme-color" content="#d62828" />
+  <link rel="icon" type="image/png" sizes="32x32" href="redrtech.png" />
+  <link rel="manifest" href="site.webmanifest" />
+
+  <style>
+    :root {
+      --cor-primaria: #d62828;
+      --cor-sucesso: #2a8a2a;
+      --cor-erro: #d62828;
+      --cor-fundo: #f9f9f9;
+      --cor-texto: #222;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--cor-fundo);
+      color: var(--cor-texto);
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body.dark-mode {
+      --cor-fundo: #1c1c1c;
+      --cor-texto: #f1f1f1;
+      background-color: var(--cor-fundo);
+      color: var(--cor-texto);
+    }
+
+    header {
+      background-color: var(--cor-primaria);
+      color: #fff;
+      text-align: center;
+      padding: 30px 20px;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
+      background-color: inherit;
+      color: inherit;
+    }
+
+    textarea {
+      height: 120px;
+      resize: vertical;
+    }
+
+    canvas {
+      margin: 20px auto;
+      border: 2px dashed #aaa;
+      display: block;
+      background: #fff;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .btn {
+      background-color: var(--cor-primaria);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      font-size: 1rem;
+      border-radius: 6px;
+      margin: 10px 5px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background-color: #a71e1e;
+    }
+
+    #successMsg {
+      margin-top: 10px;
+      font-weight: bold;
+      display: none;
+      font-size: 1rem;
+    }
+
+    #successMsg.show {
+      display: block;
+    }
+
+    #historyList img {
+      height: 100px;
+      margin: 10px;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #555;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    .theme-toggle:hover {
+      background: #333;
+    }
+
+    footer {
+      margin-top: 50px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #666;
+      padding-bottom: 30px;
+    }
+
+    @media (max-width: 600px) {
+      .btn {
+        font-size: 0.95rem;
+        padding: 10px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="alternarTema()">🌓 Tema</button>
+
+  <header>
+    <h1>RedR-Tech | Gerador de QR Code</h1>
+  </header>
+
+  <main>
+    <input id="urlInput" type="url" placeholder="Ex: https://www.redrtech.com" />
+    <button class="btn" onclick="copiarURL()">Copiar URL</button>
+    <textarea id="textInput" placeholder="Texto adicional para impressão..."></textarea>
+
+    <canvas id="qrCanvas" width="2480" height="3508"></canvas>
+
+    <button id="downloadComLogoBtn" class="btn" disabled>Baixar com logo</button>
+    <button id="downloadSemLogoBtn" class="btn" disabled>Baixar sem logo</button>
+    <button class="btn" onclick="exportarPDF()" disabled id="pdfBtn">Exportar como PDF</button>
+
+    <div id="successMsg"></div>
+
+    <h3>Últimos QR Codes gerados:</h3>
+    <div id="historyList"></div>
+  </main>
+
+  <footer>
+    <p>RedR-Tech © 2025 — Todos os direitos reservados</p>
+    <p>📞 (64) 99313-9106 &nbsp; | &nbsp;
+      <a href="https://www.instagram.com/redrtech" target="_blank">@redrtech</a>
+    </p>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+    const canvas = document.getElementById('qrCanvas');
+    const ctx = canvas.getContext('2d');
+    const urlInput = document.getElementById('urlInput');
+    const textInput = document.getElementById('textInput');
+    const downloadComLogoBtn = document.getElementById('downloadComLogoBtn');
+    const downloadSemLogoBtn = document.getElementById('downloadSemLogoBtn');
+    const pdfBtn = document.getElementById('pdfBtn');
+    const successMsg = document.getElementById('successMsg');
+    const historyList = document.getElementById('historyList');
+
+    const logo = new Image();
+    logo.src = 'logo-redrtech.png';
+
+    let ultimaImagemSemLogo = null;
+
+    function isValidUrl(string) {
+      try {
+        new URL(string);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function normalizeUrl(input) {
+      return /^https?:\/\//i.test(input) ? input : "https://" + input;
+    }
+
+    function gerarQRCodeComTexto(url, texto) {
+      const tempDiv = document.createElement('div');
+      new QRCode(tempDiv, {
+        text: url,
+        width: 800,
+        height: 800,
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      setTimeout(() => {
+        const img = tempDiv.querySelector('img');
+        if (img) {
+          const qrImg = new Image();
+          qrImg.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const qrSize = 1600;
+            const qrX = (canvas.width - qrSize) / 2;
+            const qrY = 400;
+
+            ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+            ultimaImagemSemLogo = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            const logoSize = 300;
+            const logoX = qrX + (qrSize - logoSize) / 2;
+            const logoY = qrY + (qrSize - logoSize) / 2;
+            ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+
+            ctx.font = "60px Arial";
+            ctx.fillStyle = "#000";
+            ctx.textAlign = "left";
+
+            const marginX = 200;
+            const startY = qrY + qrSize + 150;
+            const maxWidth = canvas.width - marginX * 2;
+            const lineHeight = 70;
+
+            const linhas = quebrarTexto(ctx, texto, maxWidth);
+            linhas.forEach((linha, i) => {
+              ctx.fillText(linha, marginX, startY + i * lineHeight);
+            });
+
+            showMessage("QR Code gerado com sucesso!", true);
+            downloadComLogoBtn.disabled = false;
+            downloadSemLogoBtn.disabled = false;
+            pdfBtn.disabled = false;
+            salvarNoHistorico(canvas.toDataURL());
+          };
+          qrImg.src = img.src;
+        }
+      }, 100);
+    }
+
+    function quebrarTexto(ctx, texto, maxWidth) {
+      const palavras = texto.split(" ");
+      const linhas = [];
+      let linha = "";
+      palavras.forEach(palavra => {
+        const teste = linha + palavra + " ";
+        if (ctx.measureText(teste).width > maxWidth) {
+          linhas.push(linha.trim());
+          linha = palavra + " ";
+        } else {
+          linha = teste;
+        }
+      });
+      if (linha) linhas.push(linha.trim());
+      return linhas;
+    }
+
+    function showMessage(msg, sucesso) {
+      successMsg.textContent = msg;
+      successMsg.style.color = sucesso ? 'green' : 'red';
+      successMsg.classList.add("show");
+      setTimeout(() => successMsg.classList.remove("show"), 4000);
+    }
+
+    function copiarURL() {
+      const texto = urlInput.value.trim();
+      if (texto) {
+        navigator.clipboard.writeText(texto)
+          .then(() => showMessage("URL copiada!", true))
+          .catch(() => showMessage("Erro ao copiar URL", false));
+      }
+    }
+
+    function atualizarQRCode() {
+      let url = urlInput.value.trim();
+      if (url) url = normalizeUrl(url);
+      const texto = textInput.value.trim();
+
+      if (isValidUrl(url)) {
+        gerarQRCodeComTexto(url, texto);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        showMessage("URL inválida", false);
+        downloadComLogoBtn.disabled = true;
+        downloadSemLogoBtn.disabled = true;
+        pdfBtn.disabled = true;
+      }
+    }
+
+    urlInput.addEventListener("input", atualizarQRCode);
+    textInput.addEventListener("input", atualizarQRCode);
+
+    downloadComLogoBtn.addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "qrcode_redrtech_com_logo.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+
+    downloadSemLogoBtn.addEventListener("click", () => {
+      if (ultimaImagemSemLogo) {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.putImageData(ultimaImagemSemLogo, 0, 0);
+        const link = document.createElement("a");
+        link.download = "qrcode_redrtech_sem_logo.png";
+        link.href = tempCanvas.toDataURL("image/png");
+        link.click();
+      }
+    });
+
+    function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [canvas.width, canvas.height]
+      });
+      const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+      pdf.save("qrcode_redrtech.pdf");
+    }
+
+    function salvarNoHistorico(dataUrl) {
+      let historico = JSON.parse(localStorage.getItem("qrHistory")) || [];
+      historico.unshift(dataUrl);
+      historico = historico.slice(0, 5);
+      localStorage.setItem("qrHistory", JSON.stringify(historico));
+      renderizarHistorico();
+    }
+
+    function renderizarHistorico() {
+      const historico = JSON.parse(localStorage.getItem("qrHistory")) || [];
+      historyList.innerHTML = "";
+      historico.forEach(src => {
+        const img = document.createElement("img");
+        img.src = src;
+        historyList.appendChild(img);
+      });
+    }
+
+    function alternarTema() {
+      document.body.classList.toggle("dark-mode");
+      localStorage.setItem("modo", document.body.classList.contains("dark-mode") ? "dark" : "light");
+    }
+
+    window.addEventListener("load", () => {
+      renderizarHistorico();
+      urlInput.focus();
+      if (localStorage.getItem("modo") === "dark") {
+        document.body.classList.add("dark-mode");
+      }
+    });
+  </script>
+</body>
+</html>
